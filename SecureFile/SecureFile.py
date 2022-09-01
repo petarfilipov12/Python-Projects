@@ -1,4 +1,3 @@
-import sys
 import hashlib
 import base64
 from PyQt5.QtCore import QSize
