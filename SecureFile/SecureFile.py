@@ -7,7 +7,7 @@ from Crypto.Cipher import AES
 FILE = "data"
 PASSWORD_HASH_FILE = "passhash"
 
-DEBUG = True
+DEBUG = False
 
 
 class MainWindow(QMainWindow):
@@ -17,7 +17,10 @@ class MainWindow(QMainWindow):
         self.key = ""
         self.nonce = ""
         self.PASSWORD_HASH = ""
-        self.text = ""
+        self.data_text = ""
+        self.LogInComplete = False
+        self.InEditTextWindow = False
+        self.CanExit = False
 
         try:
             self.PASSWORD_HASH = self.GetPassHash()
@@ -29,6 +32,41 @@ class MainWindow(QMainWindow):
         except FileNotFoundError:
             self.InItWindow()
 
+
+    def closeEvent(self, event):
+        if (self.LogInComplete != False):
+            saved_text = self.ReadTextFromEncryptedFile()
+            if(self.InEditTextWindow != False):
+                self.data_text = self.PlainText.toPlainText()
+
+            if(saved_text != self.data_text):
+                msg = QMessageBox()
+                msg.setWindowTitle("SecureFile")
+                msg.setText("Do you want to save the data before closing?")
+                msg.setIcon(QMessageBox.Question)
+                msg.setStandardButtons(QMessageBox.Save | QMessageBox.Ignore | QMessageBox.Cancel)
+                msg.setDefaultButton(QMessageBox.Save)
+                msg.buttonClicked.connect(self.popup_button_clicked)
+                msg.exec_()
+
+                if(self.CanExit != False):
+                    event.accept() # let the window close
+                else:
+                    event.ignore()
+            else:
+                event.accept() # let the window close
+        else:
+            event.accept() # let the window close
+
+    def popup_button_clicked(self, i):
+        button_pressed = i.text()
+        if(button_pressed == 'Save'):
+            self.SaveText(text = self.data_text)
+            self.CanExit = True
+        elif(button_pressed == 'Ignore'):
+            self.CanExit = True
+        elif(button_pressed == 'Cancel'):
+            self.CanExit = False
 
     def GetPassHash(self):
         global PASSWORD_HASH_FILE
@@ -115,6 +153,7 @@ class MainWindow(QMainWindow):
         if(password_hash == self.PASSWORD_HASH):
             (self.key, self.nonce) = self.GetKeyAndNonce(password=password)
 
+            self.LogInComplete = True
             self.EditTextWindow()
         else:
             msg = QMessageBox()
@@ -130,11 +169,12 @@ class MainWindow(QMainWindow):
         return (key, nonce)
     
     def EditTextWindow(self):
+        self.InEditTextWindow = True
         self.setMinimumSize(QSize(800, 600))
         
         self.PlainText = QPlainTextEdit()
-        text = self.ReadTextFromEncryptedFile()
-        self.PlainText.appendPlainText(text)
+        self.data_text = self.ReadTextFromEncryptedFile()
+        self.PlainText.appendPlainText(self.data_text)
 
         toolBar = QToolBar()
         toolButton = QToolButton()
@@ -181,8 +221,11 @@ class MainWindow(QMainWindow):
         return text
 
     def save_button_was_clicked(self):
+        self.data_text = self.PlainText.toPlainText()
+        self.SaveText(text = self.data_text)
+
+    def SaveText(self, text):
         try:
-            text = self.PlainText.toPlainText()
             encrypted_text = self.EncryptText(text = text)
 
             self.SaveTextToFile(text = encrypted_text)
@@ -207,6 +250,7 @@ class MainWindow(QMainWindow):
 
     def change_pass_button_was_clicked(self):
         self.data_text = self.PlainText.toPlainText()
+        self.InEditTextWindow = False
         self.ChangePassWindow()
 
     def ChangePassWindow(self):
@@ -247,7 +291,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def back_button_was_clicked(self):
-        self.Window2()
+        self.EditTextWindow()
         
     def submit_button_was_clicked(self):
         password = self.current_pass_input_text.text()
@@ -288,6 +332,7 @@ class MainWindow(QMainWindow):
             if(DEBUG == True):
                 print(e)
 
+        self.InEditTextWindow = True
         self.EditTextWindow()
        
             
